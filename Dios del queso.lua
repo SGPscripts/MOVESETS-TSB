@@ -1,31 +1,55 @@
--- dios del queso (morph estilo GOJO) - visual only
--- ejecutalo con el personaje ya cargado. si queres cambiar algo, editá las constantes abajo.
+-- dios del queso (morph reforzado estilo GOJO) - visual only
+-- ejecutalo con el personaje ya spawneado
 
--- toggle (copiado estilo GOJO): si lo queres desactivar pon false
-getgenv().cheeseMorph = true
+getgenv().cheeseMorph = true -- poner false si no querés morph automatico
 
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
 local player = Players.LocalPlayer
 
--- ===== CAMBIAR ACA (ids que me pasaste) =====
+-- ====== CAMBIAR ACA (ids que me pasaste) ======
 local SHIRT_ID = 6187928493    -- camisa clásica (bear)
 local PANTS_ID = 6187941992    -- pantalón clásico (bear)
--- accesorios (en una sola string, separados por comas, SIN "rbxassetid://")
+-- accesorios en una sola string, separados por comas, SIN "rbxassetid://"
 local ACCESSORIES_STRING = "9063836052,9572366291" -- cabeza bear, cheese aura
--- ============================================
+-- ==============================================
 
-local function safeApplyDescription(humanoid, desc)
-    -- intenta varias veces por si tsb pisa el avatar al spawnear
-    for i = 1, 6 do
-        local ok, err = pcall(function()
-            humanoid:ApplyDescription(desc)
-        end)
-        if ok then
-            return true
-        end
-        task.wait(0.25)
+-- helpers
+local function split(s, sep)
+    local out = {}
+    for token in string.gmatch(s, "([^" .. sep .. "]+)") do
+        token = token:gsub("^%s*(.-)%s*$", "%1")
+        if token ~= "" then table.insert(out, token) end
     end
-    return false
+    return out
+end
+
+local function countExpectedAccessories()
+    if not ACCESSORIES_STRING or ACCESSORIES_STRING == "" then return 0 end
+    return #split(ACCESSORIES_STRING, ",")
+end
+
+local function has_shirt_pants_applied(char)
+    local shirt = char:FindFirstChildOfClass("Shirt")
+    local pants = char:FindFirstChildOfClass("Pants")
+    local okShirt = false
+    local okPants = false
+    if shirt and shirt.ShirtTemplate then
+        okShirt = tostring(SHIRT_ID) == tostring((shirt.ShirtTemplate:gsub("rbxassetid://", "")))
+    end
+    if pants and pants.PantsTemplate then
+        okPants = tostring(PANTS_ID) == tostring((pants.PantsTemplate:gsub("rbxassetid://", "")))
+    end
+    return okShirt and okPants
+end
+
+local function count_current_accessories(char)
+    local c = 0
+    for _,v in pairs(char:GetChildren()) do
+        if v:IsA("Accessory") then c = c + 1 end
+    end
+    return c
 end
 
 local function ponerAuraEnManos(char)
@@ -55,12 +79,14 @@ local function ponerAuraEnManos(char)
     crear(rightHand)
 end
 
-local function aplicarMorph(char)
-    if not char then return end
+-- aplica humanoiddescription con reintentos y checks
+local function applyDescriptionWithChecks(char)
+    if not char then return false end
     local humanoid = char:FindFirstChildWhichIsA("Humanoid")
-    if not humanoid then return end
+    if not humanoid then return false end
 
-    -- crear o tomar description base
+    local expectedAcc = countExpectedAccessories()
+
     local desc
     local ok, got = pcall(function() return humanoid:GetAppliedDescription() end)
     if ok and got then
@@ -69,12 +95,11 @@ local function aplicarMorph(char)
         desc = Instance.new("HumanoidDescription")
     end
 
-    -- definir cosas básicas
-    -- nota: usamos numeros para shirt/pants como en algunos scripts GOJO-style
+    -- setear ropa (usar numeros)
     desc.Shirt = SHIRT_ID
     desc.Pants = PANTS_ID
 
-    -- accesorios en una linea (string con ids separados por coma)
+    -- setear accesorios: lo ponemos en todas las propiedades de accessory para que salga seguro
     if type(ACCESSORIES_STRING) == "string" and ACCESSORIES_STRING ~= "" then
         desc.HatAccessory = ACCESSORIES_STRING
         desc.HairAccessory = ACCESSORIES_STRING
@@ -86,26 +111,83 @@ local function aplicarMorph(char)
         desc.WaistAccessory = ACCESSORIES_STRING
     end
 
-    -- aplicamos la desc (con reintentos)
-    local applied = safeApplyDescription(humanoid, desc)
-    if not applied then
-        warn("[dios del queso] no se pudo aplicar description (tsb pudo pisar). Intentá re-ejecutar el script o ejecutar justo despues de spawnear.")
+    -- intentar aplicar varias veces y comprobar resultado
+    local success = false
+    for i = 1, 12 do -- reintentar ~12 veces (3s)
+        local applied = false
+        local okApply, err = pcall(function()
+            humanoid:ApplyDescription(desc)
+            applied = true
+        end)
+        task.wait(0.18)
+
+        -- checks: shirt+pants + accesorios (si esperamos accesorios)
+        local clothesOk = has_shirt_pants_applied(char)
+        local accOk = true
+        if expectedAcc > 0 then
+            local curAcc = count_current_accessories(char)
+            accOk = (curAcc >= expectedAcc)
+        end
+
+        if applied and clothesOk and accOk then
+            success = true
+            break
+        end
+        -- si no salió, reintentamos
     end
 
-    -- esperar un poco y poner aura local en manos
-    task.delay(0.6, function() ponerAuraEnManos(char) end)
+    return success
 end
 
--- aplica al char actual y se reconecta al respawn
+-- aplica y monitorea por un tiempo corto para reaplicar si tsb pisa
+local function robustApplyAndMonitor(char)
+    if not char then return end
+    local humanoid = char:FindFirstChildWhichIsA("Humanoid")
+    if not humanoid then return end
+
+    local ok = applyDescriptionWithChecks(char)
+    ponerAuraEnManos(char)
+
+    -- monitoreo por ~6 segundos: si el shirt/pants desaparecen o accesorios bajan, re-aplicamos una vez
+    local monitorTime = 6
+    local checkInterval = 0.4
+    local elapsed = 0
+    local reattempted = false
+    while elapsed < monitorTime do
+        task.wait(checkInterval)
+        elapsed = elapsed + checkInterval
+
+        local clothesOk = has_shirt_pants_applied(char)
+        local expectedAcc = countExpectedAccessories()
+        local accOk = true
+        if expectedAcc > 0 then
+            accOk = (count_current_accessories(char) >= expectedAcc)
+        end
+
+        if not clothesOk or not accOk then
+            if not reattempted then
+                -- intentar reaplicar rápido
+                applyDescriptionWithChecks(char)
+                ponerAuraEnManos(char)
+                reattempted = true
+            end
+        end
+    end
+
+    return ok
+end
+
+-- bind al character y respawn
 local function bindCharacter(c)
     task.spawn(function()
-        -- aguantar a que humaoid y rig carguen
         c:WaitForChild("Humanoid", 5)
-        task.wait(0.45)
+        task.wait(0.35)
         if getgenv().cheeseMorph then
-            aplicarMorph(c)
+            local ok = robustApplyAndMonitor(c)
+            if not ok then
+                warn("[dios del queso] no se pudo asegurar morph 100%. Probá re-ejecutar justo despues de spawnear.")
+            end
         else
-            -- si el user desactiva morph, igual colocamos aura y devolvemos
             ponerAuraEnManos(c)
         end
     end)
@@ -113,9 +195,8 @@ end
 
 local char = player.Character or player.CharacterAdded:Wait()
 bindCharacter(char)
-
 player.CharacterAdded:Connect(function(newChar)
     bindCharacter(newChar)
 end)
 
-print("dios del queso: script cargado :D")
+print("dios del queso (reforzado) cargado :D")
