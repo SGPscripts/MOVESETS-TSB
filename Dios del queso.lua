@@ -1,51 +1,45 @@
--- dios del queso – morph copia literal de GOJO
+-- dios del queso – morph estilo GOJO (FIXED)
 -- visual only
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-
 local lp = Players.LocalPlayer
 local char = lp.Character or lp.CharacterAdded:Wait()
 local hum = char:WaitForChild("Humanoid")
 
--- ===== TUS IDS =====
+-- ==== TUS IDS ====
 local SHIRT_ID = 6187928493
 local PANTS_ID = 6187941992
 local ACCESSORIES = "9063836052,9572366291" -- cabeza bear, cheese aura
--- ===================
+-- =================
 
--- crear description LIMPIA (clave)
+-- humanoid description LIMPIO
 local desc = Instance.new("HumanoidDescription")
 
 desc.Shirt = SHIRT_ID
 desc.Pants = PANTS_ID
 
--- GOJO-style: poner accesorios en TODAS las categorias
+-- SOLO props compatibles (como GOJO)
 desc.HatAccessory = ACCESSORIES
 desc.HairAccessory = ACCESSORIES
 desc.FaceAccessory = ACCESSORIES
 desc.NeckAccessory = ACCESSORIES
-desc.ShoulderAccessory = ACCESSORIES
-desc.FrontAccessory = ACCESSORIES
-desc.BackAccessory = ACCESSORIES
-desc.WaistAccessory = ACCESSORIES
 
--- fuerza r6 como hacen muchos scripts
+-- forzar r6 (opcional pero ayuda)
 pcall(function()
 	hum.RigType = Enum.HumanoidRigType.R6
 end)
 
--- aplicar MUCHAS veces (esto es lo importante)
-for i = 1, 20 do
+-- aplicar varias veces (anti reset TSB)
+for i = 1, 15 do
 	pcall(function()
 		hum:ApplyDescription(desc)
 	end)
 	task.wait(0.15)
 end
 
--- reaplicar unos segundos después (anti TSB reset)
-task.delay(1.5, function()
-	for i = 1, 10 do
+-- reaplicar despues (como GOJO)
+task.delay(1.2, function()
+	for i = 1, 8 do
 		pcall(function()
 			hum:ApplyDescription(desc)
 		end)
@@ -53,4 +47,4 @@ task.delay(1.5, function()
 	end
 end)
 
-print("dios del queso morph aplicado")
+print("dios del queso aplicado correctamente :D")
