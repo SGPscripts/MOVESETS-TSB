@@ -47,7 +47,7 @@ end
 
 -- >>> CAMBIAR ACA <<<
 local SHIRT_ID = 10250370539   -- poné el ID NUMERO de tu shirt
-local PANTS_ID = 2222222222   -- poné el ID NUMERO de tus pants
+local PANTS_ID = 6187941992  -- poné el ID NUMERO de tus pants
 
 local shirt = Instance.new("Shirt")
 shirt.ShirtTemplate = "rbxassetid://" .. SHIRT_ID
@@ -72,7 +72,7 @@ for _,id in pairs(ACCESORIOS) do
     local ok,asset = pcall(function()
         return InsertService:LoadAsset(id)
     end)
-    if ok and asset then
+    if ok and assehttps://www.roblox.com/es/catalog/6187941992/BEAR-Alphat then
         for _,obj in pairs(asset:GetChildren()) do
             if obj:IsA("Accessory") then
                 obj.Parent = char
