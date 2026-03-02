@@ -89,3 +89,19 @@ if root then
         end
     end)
 end
+
+local Players = game:GetService("Players")
+local char = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
+local head = char:WaitForChild("Head") -- donde vamos a poner el sonido
+
+-- crear el sonido
+local cheeseSound = Instance.new("Sound")
+cheeseSound.Name = "GIMME THE CHEESE"
+cheeseSound.SoundId = "rbxassetid://140183508936964" -- pon tu ID
+cheeseSound.Volume = 1 -- bien fuerte XD
+cheeseSound.PlayOnRemove = false
+cheeseSound.Looped = false
+cheeseSound.Parent = head
+
+-- reproducir apenas se ejecute
+cheeseSound:Play()
