@@ -46,7 +46,7 @@ for _,v in pairs(char:GetChildren()) do
 end
 
 -- >>> CAMBIAR ACA <<<
-local SHIRT_ID = 1111111111   -- poné el ID NUMERO de tu shirt
+local SHIRT_ID = 10250370539   -- poné el ID NUMERO de tu shirt
 local PANTS_ID = 2222222222   -- poné el ID NUMERO de tus pants
 
 local shirt = Instance.new("Shirt")
