@@ -1,65 +1,64 @@
--- dios del queso (visual only, estilo GOJO)
+-- DIOS DEL QUESO – avatar client-side (estilo GOJO)
+-- ejecutalo con el personaje ya cargado
 
 local Players = game:GetService("Players")
+local InsertService = game:GetService("InsertService")
+
 local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
 
-local function aplicarDiosDelQueso(char)
-    local humanoid = char:WaitForChild("Humanoid")
-
-    -- =========================
-    -- SKIN (HumanoidDescription)
-    -- =========================
-
-    local desc = humanoid:GetAppliedDescription()
-
-    -- >>> CAMBIAR ACA <<<
-    desc.Shirt = 10250370539
-    desc.Pants = 6187941992
-
-    -- accesorios (IDS separados por coma)
-    -- si tenes mas, seguilos poniendo asi
-    desc.HatAccessory = "9063836052,957236629158"
-
-    -- aplicar skin
-    humanoid:ApplyDescription(desc)
-
-    -- =========================
-    -- AURA AMARILLA EN MANOS
-    -- =========================
-
-    task.wait(1) -- esperar q cargue el rig
-
-    local leftHand = char:FindFirstChild("LeftHand") or char:FindFirstChild("Left Arm")
-    local rightHand = char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm")
-
-    local function ponerAura(mano)
-        if not mano then return end
-        if mano:FindFirstChild("CheeseAura") then return end
-
-        local p = Instance.new("ParticleEmitter")
-        p.Name = "CheeseAura"
-        p.Texture = "rbxassetid://243660364"
-        p.Rate = 50
-        p.Lifetime = NumberRange.new(0.6,1)
-        p.Speed = NumberRange.new(0.5,1)
-        p.Size = NumberSequence.new{
-            NumberSequenceKeypoint.new(0,0.6),
-            NumberSequenceKeypoint.new(1,0)
-        }
-        p.Color = ColorSequence.new(Color3.fromRGB(255,220,60))
-        p.LightEmission = 1
-        p.Parent = mano
+-- =========================
+-- FORZAR R6 (CUADRADITO)
+-- =========================
+pcall(function()
+    if char:FindFirstChild("Humanoid") then
+        char.Humanoid.RigType = Enum.HumanoidRigType.R6
     end
+end)
 
-    ponerAura(leftHand)
-    ponerAura(rightHand)
+-- =========================
+-- LIMPIAR AVATAR
+-- =========================
+for _,v in pairs(char:GetChildren()) do
+    if v:IsA("Accessory") or v:IsA("Shirt") or v:IsA("Pants") then
+        v:Destroy()
+    end
 end
 
--- aplicar al character actual
-local char = player.Character or player.CharacterAdded:Wait()
-aplicarDiosDelQueso(char)
+-- =========================
+-- ROPA BEAR (CLÁSICA)
+-- =========================
+local SHIRT_ID = 6187928493
+local PANTS_ID = 6187941992
 
--- reaplicar al respawnear
-player.CharacterAdded:Connect(function(newChar)
-    aplicarDiosDelQueso(newChar)
-end)
+local shirt = Instance.new("Shirt")
+shirt.ShirtTemplate = "rbxassetid://"..SHIRT_ID
+shirt.Parent = char
+
+local pants = Instance.new("Pants")
+pants.PantsTemplate = "rbxassetid://"..PANTS_ID
+pants.Parent = char
+
+-- =========================
+-- ACCESORIOS
+-- =========================
+local ACCESORIOS = {
+    9063836052, -- cabeza bear
+    9572366291  -- cheese aura
+}
+
+for _,id in pairs(ACCESORIOS) do
+    local ok,asset = pcall(function()
+        return InsertService:LoadAsset(id)
+    end)
+
+    if ok and asset then
+        for _,obj in pairs(asset:GetChildren()) do
+            if obj:IsA("Accessory") then
+                obj.Parent = char
+            end
+        end
+    end
+end
+
+print("dios del queso cargado B)")
