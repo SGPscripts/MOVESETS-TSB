@@ -65,14 +65,14 @@ pants.Parent = char
 -- aca van LOS IDS DE LOS ACCESORIOS (solo numeros)
 local ACCESORIOS = {
     9063836052
-    4444444444, -- accesorio 2 (ej: cabeza bear)
+    957236629158 -- accesorio 2 (ej: cabeza bear)
 }
 
 for _,id in pairs(ACCESORIOS) do
     local ok,asset = pcall(function()
         return InsertService:LoadAsset(id)
     end)
-    if ok and assehttps://www.roblox.com/es/catalog/6187941992/BEAR-Alphat then
+    if ok and asset then
         for _,obj in pairs(asset:GetChildren()) do
             if obj:IsA("Accessory") then
                 obj.Parent = char
