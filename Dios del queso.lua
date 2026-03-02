@@ -1,74 +1,91 @@
-local plr = game.Players.LocalPlayer
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
-local function aplicarAura(char)
-    -- =====================
-    -- MANOS CON PARTICULAS
-    -- =====================
-    local function manosQueso(mano)
-        if not mano then return end
-        if mano:FindFirstChild("QuesoParticles") then return end
+local plr = Players.LocalPlayer
+local char = plr.Character or plr.CharacterAdded:Wait()
 
-        local pe = Instance.new("ParticleEmitter")
-        pe.Name = "QuesoParticles"
-        pe.Texture = "rbxassetid://243660364"
-        pe.Rate = 120
-        pe.Lifetime = NumberRange.new(0.5, 1)
-        pe.Speed = NumberRange.new(1.5, 3)
-        pe.SpreadAngle = Vector2.new(360, 360)
-        pe.Size = NumberSequence.new{
-            NumberSequenceKeypoint.new(0, 1.5),
-            NumberSequenceKeypoint.new(1, 0)
-        }
-        pe.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 220, 80)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 120))
-        }
-        pe.LightEmission = 1
-        pe.Parent = mano
-    end
+-- colores
+local AURA_COLOR = Color3.fromRGB(255,220,80) -- queso
+local HAND_COLOR = Color3.fromRGB(255,230,90)
 
-    manosQueso(char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm"))
-    manosQueso(char:FindFirstChild("LeftHand") or char:FindFirstChild("Left Arm"))
+-- =====================
+-- LUZ + PARTICULAS EN MANOS
+-- =====================
+local function setupHand(hand)
+    if not hand then return end
 
-    -- =====================
-    -- AURA GIGANTE CON LUZ
-    -- =====================
-    local root = char:WaitForChild("HumanoidRootPart")
-    if root:FindFirstChild("AuraQueso") then return end
+    -- luz
+    local light = Instance.new("PointLight")
+    light.Name = "QuesoLight"
+    light.Color = HAND_COLOR
+    light.Brightness = 6
+    light.Range = 12
+    light.Shadows = false
+    light.Parent = hand
 
-    local attachment = Instance.new("Attachment")
-    attachment.Name = "AuraAttachment"
-    attachment.Parent = root
-
-    local pe = Instance.new("ParticleEmitter")
-    pe.Name = "AuraQueso"
-    pe.Texture = "rbxassetid://243660364"
-    pe.Rate = 400
-    pe.Lifetime = NumberRange.new(1.5, 2.5)
-    pe.Speed = NumberRange.new(3, 5)
-    pe.SpreadAngle = Vector2.new(360, 360)
-    pe.Size = NumberSequence.new{
-        NumberSequenceKeypoint.new(0, 5),
+    -- partículas
+    local partEmit = Instance.new("ParticleEmitter")
+    partEmit.Name = "QuesoHandsParticles"
+    partEmit.Texture = "rbxassetid://243660364"
+    partEmit.Rate = 80
+    partEmit.Lifetime = NumberRange.new(0.4, 0.8)
+    partEmit.Speed = NumberRange.new(1,2)
+    partEmit.SpreadAngle = Vector2.new(360,360)
+    partEmit.Size = NumberSequence.new{
+        NumberSequenceKeypoint.new(0, 0.5),
         NumberSequenceKeypoint.new(1, 0)
     }
-    pe.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 200, 80)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 150))
-    }
-    pe.LightEmission = 1
-    pe.Parent = attachment
+    partEmit.Color = ColorSequence.new(HAND_COLOR)
+    partEmit.LightEmission = 1
+    partEmit.Parent = hand
+end
 
-    -- LUZ POTENTE
+setupHand(char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm"))
+setupHand(char:FindFirstChild("LeftHand") or char:FindFirstChild("Left Arm"))
+
+-- =====================
+-- AURA POTENTE EN TORSO
+-- =====================
+local root = char:FindFirstChild("HumanoidRootPart")
+if root then
+    local auraPart = Instance.new("Part")
+    auraPart.Name = "AuraQuesoBody"
+    auraPart.Anchored = true
+    auraPart.CanCollide = false
+    auraPart.Transparency = 1
+    auraPart.Size = Vector3.new(1,1,1)
+    auraPart.CFrame = root.CFrame
+    auraPart.Parent = char
+
+    -- luz gigante
     local light = Instance.new("PointLight")
     light.Name = "AuraLight"
-    light.Color = Color3.fromRGB(255, 220, 90)
+    light.Color = AURA_COLOR
     light.Brightness = 10
     light.Range = 25
-    light.Parent = root
-end
+    light.Shadows = false
+    light.Parent = auraPart
 
-if plr.Character then
-    aplicarAura(plr.Character)
-end
+    -- partículas enormes
+    local aura = Instance.new("ParticleEmitter")
+    aura.Name = "AuraParticles"
+    aura.Texture = "rbxassetid://243660364"
+    aura.Rate = 120
+    aura.Lifetime = NumberRange.new(0.8,1.5)
+    aura.Speed = NumberRange.new(1,3)
+    aura.SpreadAngle = Vector2.new(360,360)
+    aura.Size = NumberSequence.new{
+        NumberSequenceKeypoint.new(0, 2),
+        NumberSequenceKeypoint.new(1, 0)
+    }
+    aura.Color = ColorSequence.new(AURA_COLOR)
+    aura.LightEmission = 1
+    aura.Parent = auraPart
 
-plr.CharacterAdded:Connect(aplicarAura)
+    -- mover el aura con el root
+    RunService.RenderStepped:Connect(function()
+        if root and auraPart then
+            auraPart.CFrame = root.CFrame
+        end
+    end)
+end
