@@ -246,3 +246,74 @@ function HeroHunterDash()
     dashTrail()
     dashParticles()
 end
+-- salir volando con la 2
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local Debris = game:GetService("Debris")
+
+local plr = Players.LocalPlayer
+local char = plr.Character or plr.CharacterAdded:Wait()
+local root = char:WaitForChild("HumanoidRootPart")
+
+local COOLDOWN = false
+
+local function jumpUp()
+	if COOLDOWN then return end
+	COOLDOWN = true
+
+	local bv = Instance.new("BodyVelocity")
+	bv.MaxForce = Vector3.new(0, math.huge, 0)
+	bv.Velocity = Vector3.new(0, 90, 0) -- altura, subila si querés
+	bv.Parent = root
+
+	Debris:AddItem(bv, 0.25)
+
+	task.delay(0.8, function()
+		COOLDOWN = false
+	end)
+end
+
+-- =====================
+-- intento 1: TOOL
+-- =====================
+local function hookTool(tool)
+	if not tool:IsA("Tool") then return end
+
+	tool.Activated:Connect(function()
+		jumpUp()
+	end)
+end
+
+for _,v in pairs(plr.Backpack:GetChildren()) do
+	hookTool(v)
+end
+
+plr.Backpack.ChildAdded:Connect(hookTool)
+
+-- =====================
+-- intento 2: TECLA 2
+-- =====================
+UIS.InputBegan:Connect(function(input, gpe)
+	if gpe then return end
+
+	if input.KeyCode == Enum.KeyCode.Two then
+		jumpUp()
+	end
+end)
+
+-- =====================
+-- intento 3: emergencia xd
+-- =====================
+-- si todo falla, tocá saltar dos veces rápido
+local lastJump = 0
+UIS.InputBegan:Connect(function(input, gpe)
+	if gpe then return end
+
+	if input.KeyCode == Enum.KeyCode.Space then
+		local t = tick()
+		if t - lastJump < 0.25 then
+			jumpUp()
+		end
+		lastJump = t
+	end
+end)
