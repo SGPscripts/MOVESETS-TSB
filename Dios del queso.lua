@@ -105,3 +105,144 @@ cheeseSound.Parent = head
 
 -- reproducir apenas se ejecute
 cheeseSound:Play()
+
+-- efectos hero hunter (golpe + dash)
+-- solo visual + sonido custom
+
+local Players = game:GetService("Players")
+local plr = Players.LocalPlayer
+local char = plr.Character or plr.CharacterAdded:Wait()
+
+local root = char:WaitForChild("HumanoidRootPart")
+
+-- =====================
+-- CONFIG
+-- =====================
+local GOLPE_SOUND_ID = "rbxassetid://101467951382277" -- <- poné tu id
+local GOLPE_VOLUME = 7
+
+local EFFECT_COLOR = Color3.fromRGB(255,255,255)
+
+-- =====================
+-- SONIDO GOLPE
+-- =====================
+local function playHitSound(parent)
+    local s = Instance.new("Sound")
+    s.Name = "HitSound"
+    s.SoundId = GOLPE_SOUND_ID
+    s.Volume = GOLPE_VOLUME
+    s.PlayOnRemove = false
+    s.Parent = parent
+    s:Play()
+
+    s.Ended:Connect(function()
+        s:Destroy()
+    end)
+end
+
+-- =====================
+-- FLASH EN MANO
+-- =====================
+local function punchFlash(hand)
+    if not hand then return end
+
+    local light = Instance.new("PointLight")
+    light.Color = EFFECT_COLOR
+    light.Brightness = 8
+    light.Range = 6
+    light.Parent = hand
+
+    task.delay(0.05, function()
+        light:Destroy()
+    end)
+end
+
+-- =====================
+-- SHOCKWAVE PISO
+-- =====================
+local function groundRing(position)
+    local ring = Instance.new("Part")
+    ring.Anchored = true
+    ring.CanCollide = false
+    ring.Material = Enum.Material.Neon
+    ring.Color = EFFECT_COLOR
+    ring.Transparency = 0.35
+    ring.Size = Vector3.new(1,0.2,1)
+    ring.CFrame = CFrame.new(position) * CFrame.new(0,-2.8,0)
+    ring.Parent = workspace
+
+    task.spawn(function()
+        for i = 1,10 do
+            ring.Size += Vector3.new(1.4,0,1.4)
+            ring.Transparency += 0.07
+            task.wait(0.02)
+        end
+        ring:Destroy()
+    end)
+end
+
+-- =====================
+-- EFECTO GOLPE (CALL)
+-- =====================
+function HeroHunterHit()
+    local hand = char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm")
+
+    punchFlash(hand)
+    groundRing(root.Position)
+    playHitSound(hand or root)
+end
+
+-- =====================
+-- DASH TRAIL
+-- =====================
+local function dashTrail()
+    local att0 = Instance.new("Attachment", root)
+    local att1 = Instance.new("Attachment", root)
+    att1.Position = Vector3.new(0,0,-2)
+
+    local trail = Instance.new("Trail")
+    trail.Attachment0 = att0
+    trail.Attachment1 = att1
+    trail.Lifetime = 0.15
+    trail.Color = ColorSequence.new(EFFECT_COLOR)
+    trail.Transparency = NumberSequence.new{
+        NumberSequenceKeypoint.new(0,0),
+        NumberSequenceKeypoint.new(1,1)
+    }
+    trail.Parent = root
+
+    task.delay(0.2, function()
+        trail:Destroy()
+        att0:Destroy()
+        att1:Destroy()
+    end)
+end
+
+-- =====================
+-- DASH PARTICULAS
+-- =====================
+local function dashParticles()
+    local emit = Instance.new("ParticleEmitter")
+    emit.Texture = "rbxassetid://243660364"
+    emit.Rate = 180
+    emit.Lifetime = NumberRange.new(0.2,0.4)
+    emit.Speed = NumberRange.new(5,8)
+    emit.SpreadAngle = Vector2.new(180,180)
+    emit.Color = ColorSequence.new(EFFECT_COLOR)
+    emit.LightEmission = 1
+    emit.Parent = root
+
+    task.delay(0.15, function()
+        emit.Enabled = false
+        task.wait(0.25)
+        emit:Destroy()
+    end)
+end
+
+-- =====================
+-- EFECTO DASH (CALL)
+-- =====================
+function HeroHunterDash()
+    dashTrail()
+    dashParticles()
+end
