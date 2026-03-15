@@ -9,6 +9,7 @@
 local Players = game:GetService("Players")
 local ServerStorage = game:GetService("ServerStorage")
 local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
 local charactersFolder = ServerStorage:WaitForChild("Characters")
 local killersFolder = charactersFolder:WaitForChild("Killers")
@@ -51,7 +52,7 @@ local function safeReplaceCharacter(player, oldChar, newModel)
 	end
 
 	-- poner en workspace sin soltar la posición
-	clone.Parent = workspace
+	clone.Parent = Workspace
 
 	-- setear cframe a la posicion previa si existe
 	if posCFrame then
@@ -72,15 +73,26 @@ local function safeReplaceCharacter(player, oldChar, newModel)
 	-- esperar 1 frame para que todo se asiente
 	RunService.Heartbeat:Wait()
 
-	-- eliminar el character viejo (si existe) y forzar que el jugador use el nuevo
-	-- nota: asignar player.Character directamente no siempre es necesario, pero renombramos y limpiamos el antiguo.
+	-- IMPORTANT: poner el nuevo modelo como character del player ANTES de destruir el antiguo
+	-- esto evita que el engine pierda el control y te mande al spawn
+	pcall(function()
+		player.Character = clone
+	end)
+
+	-- intentar devolver ownership de red (mejora la respuesta de movimiento en cliente)
+	-- no es obligatorio pero ayuda en servidores con física; ignoramos errores en caso de sandbox.
+	pcall(function()
+		if prim and prim:IsA("BasePart") then
+			prim:SetNetworkOwner(player)
+		end
+	end)
+
+	-- eliminar el character viejo (si existe)
 	if oldChar and oldChar.Parent then
 		pcall(function() oldChar:Destroy() end)
 	end
 
-	-- algunos sistemas leen player.Character; esto asegura que el engine use el nuevo modelo
-	-- (renombramos y dejamos el modelo con mismo nombre que player.Name)
-	-- en la práctica esto deja al jugador con el nuevo model en la posición guardada.
+	-- final: ya está el nuevo personaje activo y en la misma posición que el viejo
 end
 
 local function getModelForPlayer(player)
@@ -130,6 +142,7 @@ end
 local function onPlayerAdded(player)
 	-- si el player se une durante la ronda, asumimos spectator (para evitar bugs)
 	-- esto es opcional; si no querés este comportamiento sacalo.
+	-- usamos _G.RoundInProgress si tu RoundManager lo marca; si no, podés quitar esta línea.
 	if _G and _G.RoundInProgress then
 		player:SetAttribute("Role", "Spectator")
 	end
@@ -153,7 +166,7 @@ end
 Players.PlayerAdded:Connect(onPlayerAdded)
 Players.PlayerRemoving:Connect(function(player)
 	-- cleanup opcional: si hay leftovers en workspace con el mismo nombre, eliminarlos
-	local w = workspace:FindFirstChild(player.Name)
+	local w = Workspace:FindFirstChild(player.Name)
 	if w and w:IsA("Model") then
 		pcall(function() w:Destroy() end)
 	end
