@@ -1,201 +1,217 @@
--- localscript: lobby music randomized (pegalo en StarterPlayer > StarterPlayerScripts)
+-- MorphSystem (ServerScriptService)
+-- Aplica "skin encima" tipo morph: quita accesorios y ropa, hace el cuerpo invisible
+-- y coloca el modelo (Ninja o Zombie) atado al HumanoidRootPart.
+-- Requisitos mínimos:
+--  ReplicatedStorage.Characters.Killers.<Zombie>
+--  ReplicatedStorage.Characters.Survivors.<Ninja>
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
 
--- ====== CONFIG ======
--- pon acá 5 ids (solo el número o string con número)
-local musicIds = {
-    "TU_ID_1", -- ej: "18374918"
-    "TU_ID_2",
-    "TU_ID_3",
-    "TU_ID_4",
-    "TU_ID_5"
-}
-
-local volume = 1           -- 0..1
-local fadeOutTime = 0.6    -- segundos para desvanecer al cortar (mejor experiencia)
-local checksRequired = 3   -- cuantas checks consecutivas necesitan indicar "in game" para confirmar
-local checkInterval = 0.5  -- intervalo entre checks (s)
--- ======================
-
--- util: shuffle tabla
-local function shuffle(t)
-    local n = #t
-    for i = n, 2, -1 do
-        local j = math.random(i)
-        t[i], t[j] = t[j], t[i]
-    end
+-- buscar carpeta Characters en ReplicatedStorage, si no está buscar en ServerStorage como fallback
+local characters = ReplicatedStorage:FindFirstChild("Characters")
+if not characters then
+	local ServerStorage = game:GetService("ServerStorage")
+	characters = ServerStorage:FindFirstChild("Characters")
+	if characters then
+		warn("MorphSystem: Characters encontrado en ServerStorage. se recomienda moverlo a ReplicatedStorage para mejor performance.")
+	else
+		error("MorphSystem: no se encontró carpeta 'Characters' en ReplicatedStorage ni ServerStorage.")
+	end
 end
 
--- crear player gui padre
-local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+local killersFolder = characters:FindFirstChild("Killers")
+local survivorsFolder = characters:FindFirstChild("Survivors")
 
--- crear sound (se recrea por cada pista para evitar bugs)
-local function makeSound(id)
-    local s = Instance.new("Sound")
-    s.SoundId = ("rbxassetid://%s"):format(tostring(id))
-    s.Looped = false
-    s.Volume = volume
-    s.PlayOnRemove = false
-    s.Parent = playerGui
-    return s
+local DEFAULT_SURVIVOR = "Ninja"
+local DEFAULT_KILLER = "Zombie"
+
+local function clearAppearance(char)
+	-- elimina accesorios y ropa, hace las partes transparentes y no colisionables
+	for _, obj in ipairs(char:GetChildren()) do
+		-- destruir accesorios para evitar superposiciones
+		if obj:IsA("Accessory") then
+			pcall(function() obj:Destroy() end)
+		-- destruir Shirt / Pants para que no se vean
+		elseif obj:IsA("Shirt") or obj:IsA("Pants") or obj:IsA("ShirtGraphic") or obj:IsA("CharacterMesh") then
+			pcall(function() obj:Destroy() end)
+		-- BodyColors / BodyGyro etc podemos dejar, pero mejor ocultar partes
+		end
+	end
+
+	-- hacer invisibles todas las BaseParts (mantener HumanoidRootPart si querés, pero suele ser invisible)
+	for _, part in ipairs(char:GetDescendants()) do
+		if part:IsA("BasePart") then
+			-- no tocar joints ni constraints (solo propiedades visuales/físicas)
+			pcall(function()
+				part.Transparency = 1
+				part.CanCollide = false
+			end)
+		elseif part:IsA("Decal") then
+			-- ocultar decals (caras, etc)
+			pcall(function() part.Transparency = 1 end)
+		end
+	end
 end
 
--- playlist inicial (copiar y shuffle)
-local playlist = {}
-for _, v in ipairs(musicIds) do
-    if v and tostring(v) ~= "" then
-        table.insert(playlist, v)
-    end
+local function sanitizeMorphModel(model)
+	-- eliminar humanoids, animators y scripts del modelo para evitar conflictos
+	for _, obj in ipairs(model:GetDescendants()) do
+		if obj:IsA("Humanoid") or obj:IsA("Animator") then
+			pcall(function() obj:Destroy() end)
+		elseif obj:IsA("Script") or obj:IsA("LocalScript") or obj:IsA("ModuleScript") then
+			-- opcional: eliminar scripts para seguridad
+			pcall(function() obj:Destroy() end)
+		end
+	end
 end
 
-if #playlist == 0 then
-    warn("lobby music: no hay ids en la playlist. pon 5 ids en la tabla musicIds.")
-    return
+local function weldModelToHRP(clone, hrp)
+	if not clone or not hrp then return end
+
+	-- asegurar primary part
+	local prim = clone.PrimaryPart or clone:FindFirstChild("HumanoidRootPart") or clone:FindFirstChildWhichIsA("BasePart")
+	if not prim then
+		-- si no hay basepart, intentar asignar la primera basepart
+		for _,v in ipairs(clone:GetDescendants()) do
+			if v:IsA("BasePart") then
+				prim = v
+				break
+			end
+		end
+	end
+	if not prim then
+		warn("MorphSystem: el modelo clon no tiene BasePart para weld.")
+		return
+	end
+
+	-- posicionar el morph exactamente donde está el hrp
+	pcall(function()
+		clone:SetPrimaryPartCFrame(hrp.CFrame)
+	end)
+
+	-- desactivar colisiones del morph
+	for _, part in ipairs(clone:GetDescendants()) do
+		if part:IsA("BasePart") then
+			pcall(function()
+				part.CanCollide = false
+			end)
+		end
+	end
+
+	-- crear WeldConstraint entre primary parts
+	local weld = Instance.new("WeldConstraint")
+	weld.Name = "MorphWeld"
+	weld.Part0 = prim
+	weld.Part1 = hrp
+	weld.Parent = prim
+
+	-- opcional: también crear AlignPosition/AlignOrientation para servers con física problemática
+	-- (no obligatorio; si notas jitter, podemos añadir Aligns después)
 end
 
-shuffle(playlist)
+local function applyMorph(player, role)
+	if not player then return end
+	local char = player.Character
+	if not char then return end
 
-local currentIndex = 0
-local currentSound = nil
-local playing = true
+	-- asegurar humanoidrootpart
+	local hrp = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChildWhichIsA("BasePart")
+	if not hrp then
+		warn("MorphSystem: "..player.Name.." no tiene HumanoidRootPart en su character.")
+		return
+	end
 
--- reproducir siguiente pista
-local function playNext()
-    if currentSound then
-        currentSound:Destroy()
-        currentSound = nil
-    end
-    currentIndex = currentIndex + 1
-    if currentIndex > #playlist then
-        -- reshuffle y volver a empezar
-        shuffle(playlist)
-        currentIndex = 1
-    end
-    local id = playlist[currentIndex]
-    currentSound = makeSound(id)
-    currentSound:Play()
-    -- cuando termina, reproducir siguiente si todavía estamos en lobby
-    local conn
-    conn = currentSound.Ended:Connect(function()
-        conn:Disconnect()
-        if playing then
-            playNext()
-        end
-    end)
+	-- limpiar apariencia del jugador
+	clearAppearance(char)
+
+	-- elegir modelo
+	local model
+	if role == "Killer" then
+		local name = player:GetAttribute("EquippedCharacter") or DEFAULT_KILLER
+		if killersFolder then model = killersFolder:FindFirstChild(name) or killersFolder:FindFirstChild(DEFAULT_KILLER) end
+	else
+		local name = player:GetAttribute("EquippedCharacter") or DEFAULT_SURVIVOR
+		if survivorsFolder then model = survivorsFolder:FindFirstChild(name) or survivorsFolder:FindFirstChild(DEFAULT_SURVIVOR) end
+	end
+	if not model then
+		warn("MorphSystem: no se encontró modelo para "..tostring(role).." ("..tostring(player.Name)..")")
+		return
+	end
+
+	-- clonar y sanitizar
+	local clone = model:Clone()
+	clone.Name = "Morph_"..player.Name
+
+	-- quitar humanoid/animator/scripts para evitar conflictos
+	sanitizeMorphModel(clone)
+
+	-- parentear el morph dentro del character para orden (también podría ir en workspace)
+	clone.Parent = char
+
+	-- asegurar primarypart
+	local prim = clone.PrimaryPart or clone:FindFirstChild("HumanoidRootPart") or clone:FindFirstChildWhichIsA("BasePart")
+	if prim and not clone.PrimaryPart then
+		clone.PrimaryPart = prim
+	end
+
+	-- weld al humanoidrootpart
+	weldModelToHRP(clone, hrp)
 end
 
--- comprobar estados del juego con varias heuristicas
-local function checkReplicatedStorageFlags()
-    -- busca nombres comunes
-    local namesBool = {"InGame", "RoundActive", "GameActive"}
-    local namesValue = {"Status", "GameState", "State"}
-    for _, n in ipairs(namesBool) do
-        local v = ReplicatedStorage:FindFirstChild(n)
-        if v and v:IsA("BoolValue") then
-            if v.Value == true then return true end
-        end
-    end
-    for _, n in ipairs(namesValue) do
-        local v = ReplicatedStorage:FindFirstChild(n)
-        if v and v:IsA("StringValue") then
-            local val = v.Value:lower()
-            if val ~= "lobby" and val ~= "waiting" and val ~= "" then
-                return true
-            end
-        end
-    end
-    return false
+-- evento principal: cuando aparece el character aplicamos morph
+local function onCharacterAdded(player, char)
+	-- esperar un poco para que RoundManager teleporte y asigne Role
+	task.wait(0.25)
+
+	-- esperar a que role exista (timeout corto)
+	local role = player:GetAttribute("Role")
+	if not role then
+		for i = 1, 10 do
+			task.wait(0.15)
+			role = player:GetAttribute("Role")
+			if role then break end
+		end
+	end
+	if not role then
+		-- no hay role asignado -> no morph
+		return
+	end
+
+	-- aplicar morph
+	pcall(function()
+		applyMorph(player, role)
+	end)
 end
 
-local function checkWorkspaceFlags()
-    -- cosas comunes en workspace
-    if workspace:FindFirstChild("GameStarted") or workspace:FindFirstChild("RoundStarted") or workspace:FindFirstChild("Match") then
-        return true
-    end
-    return false
+-- conectar jugadores
+local function onPlayerAdded(player)
+	player.CharacterAdded:Connect(function(char)
+		onCharacterAdded(player, char)
+	end)
+
+	-- si ya tiene char (rejoin), aplicarlo
+	if player.Character then
+		spawn(function() onCharacterAdded(player, player.Character) end)
+	end
 end
 
-local function checkActivePlayers()
-    local active = 0
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr.Character and plr.Character:FindFirstChild("Humanoid") then
-            local humanoid = plr.Character:FindFirstChild("Humanoid")
-            if humanoid and humanoid.Health > 0 then
-                active = active + 1
-            end
-        end
-    end
-    -- si hay más de 1 jugador con personaje activo, lo consideramos partida iniciada
-    return active > 1
+for _, pl in ipairs(Players:GetPlayers()) do
+	spawn(function() onPlayerAdded(pl) end)
 end
+Players.PlayerAdded:Connect(onPlayerAdded)
 
--- función compuesta y estable (requiere checksRequired confirmaciones consecutivas)
-local function detectGameStart()
-    local okCount = 0
-    for i = 1, checksRequired do
-        if checkReplicatedStorageFlags() or checkWorkspaceFlags() or checkActivePlayers() then
-            okCount = okCount + 1
-        else
-            okCount = 0
-        end
-        if okCount >= checksRequired then
-            return true
-        end
-        wait(checkInterval)
-    end
-    return false
-end
-
--- fade out helper
-local function fadeOutAndStop(soundObj, secs)
-    if not soundObj then return end
-    local startVol = soundObj.Volume
-    local steps = 10
-    local dt = secs / steps
-    for i = 1, steps do
-        if not soundObj or not soundObj.Parent then break end
-        local newV = startVol * (1 - i/steps)
-        soundObj.Volume = newV
-        wait(dt)
-    end
-    if soundObj and soundObj.Parent then
-        soundObj:Stop()
-        soundObj:Destroy()
-    end
-end
-
--- main
-spawn(function()
-    -- start playlist
-    playNext()
-
-    -- loop principal: cada cierto tiempo chequea si la partida empezó
-    while playing do
-        local started = detectGameStart()
-        if started then
-            playing = false
-            -- fade out la pista actual
-            fadeOutAndStop(currentSound, fadeOutTime)
-            -- cleanup
-            currentSound = nil
-            break
-        end
-        -- chequeo menos agresivo entre detecciones
-        wait(1)
-    end
-end)
-
--- limpieza si el jugador sale del juego (safety)
-LocalPlayer.AncestryChanged:Connect(function()
-    if not LocalPlayer:IsDescendantOf(game) then
-        if currentSound then
-            pcall(function() currentSound:Stop() end)
-            pcall(function() currentSound:Destroy() end)
-            currentSound = nil
-        end
-        playing = false
-    end
+-- cleanup: si sale el player, eliminar morph leftovers por nombre
+Players.PlayerRemoving:Connect(function(player)
+	local char = workspace:FindFirstChild(player.Name)
+	if char and char:IsA("Model") then
+		-- el morph está parented al character, así que al destruir el character se limpia
+		-- pero por si acaso, eliminar cualquier objeto llamado Morph_<player>
+		for _, obj in ipairs(char:GetChildren()) do
+			if obj.Name == "Morph_"..player.Name then
+				pcall(function() obj:Destroy() end)
+			end
+		end
+	end
 end)
