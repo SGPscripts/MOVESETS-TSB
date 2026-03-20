@@ -1,8 +1,17 @@
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RS = game:GetService("ReplicatedStorage")
 
-local roundEvent = ReplicatedStorage:WaitForChild("RoundEvent")
-local characters = ReplicatedStorage:WaitForChild("Characters")
+local Characters = RS:WaitForChild("Characters")
+
+local function getCharacter(player)
+	for i = 1, 20 do
+		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			return player.Character
+		end
+		task.wait(0.2)
+	end
+	return nil
+end
 
 local function removeMorph(player)
 	local char = player.Character
@@ -17,13 +26,12 @@ local function removeMorph(player)
 	for _,v in pairs(char:GetDescendants()) do
 		if v:IsA("BasePart") then
 			v.Transparency = 0
-			v.CanCollide = true
 		end
 	end
 end
 
 local function applyMorph(player)
-	local char = player.Character
+	local char = getCharacter(player)
 	if not char then return end
 	
 	local role = player:GetAttribute("Role")
@@ -48,9 +56,9 @@ local function applyMorph(player)
 	
 	local model
 	if role == "Killer" then
-		model = characters.Killers:FindFirstChild("Zombie")
+		model = Characters.Killers:FindFirstChild("Zombie")
 	else
-		model = characters.Survivors:FindFirstChild("Ninja")
+		model = Characters.Survivors:FindFirstChild("Ninja")
 	end
 	
 	if not model then return end
@@ -74,16 +82,15 @@ local function applyMorph(player)
 	weld.Parent = root
 end
 
---  ESCUCHAR RONDA
-roundEvent.OnClientEvent:Connect(function(type)
-	if type == "RoundStart" then
-		for _,player in pairs(Players:GetPlayers()) do
-			task.wait(0.2)
+--  CUANDO CAMBIA EL ROLE
+Players.PlayerAdded:Connect(function(player)
+	player:GetAttributeChangedSignal("Role"):Connect(function()
+		task.wait(1) --  clave: esperar a que el tp termine
+		
+		if player:GetAttribute("Role") then
 			applyMorph(player)
-		end
-	elseif type == "RoundEnd" then
-		for _,player in pairs(Players:GetPlayers()) do
+		else
 			removeMorph(player)
 		end
-	end
+	end)
 end)
