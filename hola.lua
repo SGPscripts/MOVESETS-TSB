@@ -1,7 +1,26 @@
 local Players = game:GetService("Players")
-local RS = game:GetService("ReplicatedStorage")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Characters = RS:WaitForChild("Characters")
+local roundEvent = ReplicatedStorage:WaitForChild("RoundEvent")
+local characters = ReplicatedStorage:WaitForChild("Characters")
+
+local function removeMorph(player)
+	local char = player.Character
+	if not char then return end
+	
+	for _,v in pairs(char:GetChildren()) do
+		if v.Name == "Morph" then
+			v:Destroy()
+		end
+	end
+	
+	for _,v in pairs(char:GetDescendants()) do
+		if v:IsA("BasePart") then
+			v.Transparency = 0
+			v.CanCollide = true
+		end
+	end
+end
 
 local function applyMorph(player)
 	local char = player.Character
@@ -13,35 +32,33 @@ local function applyMorph(player)
 	local hrp = char:FindFirstChild("HumanoidRootPart")
 	if not hrp then return end
 	
-	-- borrar accesorios y ropa
+	removeMorph(player)
+	
 	for _,v in pairs(char:GetChildren()) do
 		if v:IsA("Accessory") or v:IsA("Shirt") or v:IsA("Pants") then
 			v:Destroy()
 		end
 	end
 	
-	-- hacer invisible el cuerpo
-	for _,v in pairs(char:GetDescendants()) do
-		if v:IsA("BasePart") then
+	for _,v in pairs(char:GetChildren()) do
+		if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then
 			v.Transparency = 1
-			v.CanCollide = false
 		end
 	end
 	
-	-- elegir modelo
 	local model
 	if role == "Killer" then
-		model = Characters.Killers:FindFirstChild("Zombie")
+		model = characters.Killers:FindFirstChild("Zombie")
 	else
-		model = Characters.Survivors:FindFirstChild("Ninja")
+		model = characters.Survivors:FindFirstChild("Ninja")
 	end
 	
 	if not model then return end
 	
 	local clone = model:Clone()
+	clone.Name = "Morph"
 	clone.Parent = char
 	
-	-- quitar humanoid del morph
 	local hum = clone:FindFirstChildOfClass("Humanoid")
 	if hum then hum:Destroy() end
 	
@@ -51,19 +68,22 @@ local function applyMorph(player)
 	clone.PrimaryPart = root
 	clone:SetPrimaryPartCFrame(hrp.CFrame)
 	
-	-- weld
 	local weld = Instance.new("WeldConstraint")
 	weld.Part0 = root
 	weld.Part1 = hrp
 	weld.Parent = root
 end
 
--- Esto ES LA CLAVE
--- se aplica cuando cambia el role (cuando empieza la ronda)
-
-Players.PlayerAdded:Connect(function(player)
-	player:GetAttributeChangedSignal("Role"):Connect(function()
-		task.wait(0.5) -- pequeño delay para tp
-		applyMorph(player)
-	end)
+--  ESCUCHAR RONDA
+roundEvent.OnClientEvent:Connect(function(type)
+	if type == "RoundStart" then
+		for _,player in pairs(Players:GetPlayers()) do
+			task.wait(0.2)
+			applyMorph(player)
+		end
+	elseif type == "RoundEnd" then
+		for _,player in pairs(Players:GetPlayers()) do
+			removeMorph(player)
+		end
+	end
 end)
