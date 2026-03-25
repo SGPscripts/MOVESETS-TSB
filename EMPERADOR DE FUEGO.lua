@@ -17,11 +17,9 @@ local function HasTool(toolName)
     if backpack and backpack:FindFirstChild(toolName) then
         return true
     end
-
     if character and character:FindFirstChild(toolName) then
         return true
     end
-
     return false
 end
 
@@ -72,47 +70,29 @@ end
 --// ejecutar checks
 task.wait(1)
 
--- si ulti activa
 if HasTool(ULT_TOOL) then
     ShowAlert("Espera a q se acabe la ulti para cargar el script")
     return
 end
 
--- si no es genos
 if not HasTool(TOOL_NAME) then
     ShowAlert("Usa a genos porfavor")
     return
 end
 
---// ===== AURA DE FUEGO (R6) =====
-
+--// ===== AURA DE FUEGO REAL (R6) =====
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-
--- detectar torso (R6)
 local Torso = Character:FindFirstChild("Torso") or Character:FindFirstChild("HumanoidRootPart")
+
 if not Torso then
     warn("No se encontró torso para el aura de fuego")
     return
 end
 
---// partículas
-local function createFireParticle(parent, color, size, rate, lifetime, speed)
-    local particle = Instance.new("ParticleEmitter")
-    particle.Color = ColorSequence.new(color)
-    particle.LightEmission = 0.7
-    particle.Size = NumberSequence.new(size)
-    particle.Rate = rate
-    particle.Lifetime = NumberRange.new(lifetime)
-    particle.Speed = NumberRange.new(speed)
-    particle.Rotation = NumberRange.new(0, 360)
-    particle.RotSpeed = NumberRange.new(50, 120)
-    particle.Texture = "rbxassetid://243660364"
-    particle.ZOffset = 0.5
-    particle.Parent = parent
-    return particle
-end
-
--- capas de fuego fijas
-local baseFire = createFireParticle(Torso, Color3.fromRGB(255,140,0), 2, 20, 1.5, 2)  -- naranja
-local sparks = createFireParticle(Torso, Color3.fromRGB(255,180,50), 1, 10, 1, 3)     -- naranja claro
-local glow = createFireParticle(Torso, Color3.fromRGB(255,80,0), 3, 5, 2, 1)          -- rojo fuego
+-- crear la llama real
+local fire = Instance.new("Fire")
+fire.Heat = 20                  -- intensidad de la llama
+fire.Size = 7                    -- tamaño de la llama
+fire.Color = Color3.fromRGB(255,140,0)        -- naranja
+fire.SecondaryColor = Color3.fromRGB(255,50,0) -- rojo
+fire.Parent = Torso
