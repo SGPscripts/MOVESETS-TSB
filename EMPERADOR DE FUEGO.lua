@@ -90,20 +90,21 @@ if not Torso then
 end
 
 -- función para crear fuego gigante
-local function createBigFire(parent, heat, size, color, secondaryColor)
+local function createBigFire(parent, heat, size, color, secondaryColor, transparency)
     local fire = Instance.new("Fire")
     fire.Heat = heat
     fire.Size = size
     fire.Color = color
     fire.SecondaryColor = secondaryColor
+    fire.Transparency = transparency
     fire.Parent = parent
     return fire
 end
 
 -- stacking de Fire para más épico
-createBigFire(Torso, 20, 7, Color3.fromRGB(255,140,0), Color3.fromRGB(255,50,0))
-createBigFire(Torso, 25, 9, Color3.fromRGB(255,160,0), Color3.fromRGB(255,60,0))
-createBigFire(Torso, 30, 11, Color3.fromRGB(255,180,50), Color3.fromRGB(255,80,0))
+createBigFire(Torso, 20, 7, Color3.fromRGB(255,140,0), Color3.fromRGB(255,50,0), 0.5)
+createBigFire(Torso, 25, 9, Color3.fromRGB(255,160,0), Color3.fromRGB(255,60,0), 0.5)
+createBigFire(Torso, 30, 11, Color3.fromRGB(255,180,50), Color3.fromRGB(255,80,0), 0.5)
 
 -- agregar luz para que la llama resalte
 local light = Instance.new("PointLight")
