@@ -112,3 +112,90 @@ light.Color = Color3.fromRGB(255,140,0)
 light.Range = 15
 light.Brightness = 3
 light.Parent = Torso
+
+--// servicios
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+--// config
+local TOOL_NAME = "Blitz Shot"
+local MAX_FOV = 150
+
+--// buscar target (jugadores + dummies)
+local function getClosestTarget()
+    local closest = nil
+    local shortestDistance = MAX_FOV
+
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("Model") and v:FindFirstChild("Humanoid") and v:FindFirstChild("HumanoidRootPart") then
+            
+            -- evitar agarrarte a vos mismo
+            if v ~= LocalPlayer.Character then
+                
+                local pos, onScreen = Camera:WorldToViewportPoint(v.HumanoidRootPart.Position)
+                
+                if onScreen then
+                    local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+                    
+                    if dist < shortestDistance then
+                        shortestDistance = dist
+                        closest = v
+                    end
+                end
+            end
+        end
+    end
+
+    return closest
+end
+
+--// dirección asistida
+local function getAimDirection()
+    local target = getClosestTarget()
+
+    if target then
+        local targetPos = target.HumanoidRootPart.Position
+        local camPos = Camera.CFrame.Position
+
+        local normalDir = Camera.CFrame.LookVector
+        local targetDir = (targetPos - camPos).Unit
+
+        -- suavidad (no aimlock)
+        return normalDir:Lerp(targetDir, 0.25)
+    end
+
+    return Camera.CFrame.LookVector
+end
+
+--// hookear tool
+local function setupTool(tool)
+    if tool.Name ~= TOOL_NAME then return end
+
+    tool.Activated:Connect(function()
+        local dir = getAimDirection()
+
+        print("Aim Assist Direction:", dir)
+
+        -- acá conectás con tu disparo real
+    end)
+end
+
+-- detectar tools
+local function checkTools()
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+
+    for _, tool in pairs(char:GetChildren()) do
+        if tool:IsA("Tool") then
+            setupTool(tool)
+        end
+    end
+
+    char.ChildAdded:Connect(function(v)
+        if v:IsA("Tool") then
+            setupTool(v)
+        end
+    end)
+end
+
+checkTools()
