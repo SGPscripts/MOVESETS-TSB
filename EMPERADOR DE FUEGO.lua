@@ -2,7 +2,6 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local SoundService = game:GetService("SoundService")
-local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -85,15 +84,14 @@ if not HasTool(TOOL_NAME) then
     return
 end
 
---// ===== AURA DE FUEGO (R6 FIX) =====
+--// ===== AURA DE FUEGO (R6) =====
 
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 
--- detectar torso (R6 + fallback)
-local Torso = Character:FindFirstChild("Torso") or Character:FindFirstChild("UpperTorso") or Character:FindFirstChild("HumanoidRootPart")
-
+-- detectar torso (R6)
+local Torso = Character:FindFirstChild("Torso") or Character:FindFirstChild("HumanoidRootPart")
 if not Torso then
-    warn("No se encontró torso")
+    warn("No se encontró torso para el aura de fuego")
     return
 end
 
@@ -114,31 +112,7 @@ local function createFireParticle(parent, color, size, rate, lifetime, speed)
     return particle
 end
 
--- capas
-local baseFire = createFireParticle(Torso, Color3.fromRGB(255,140,0), 2, 20, 1.5, 2)
-local sparks = createFireParticle(Torso, Color3.fromRGB(255,220,100), 1, 10, 1, 3)
-local glow = createFireParticle(Torso, Color3.fromRGB(255,180,50), 3, 5, 2, 1)
-
---// overheat
-local function setOverheat(state)
-    if state then
-        baseFire.Color = ColorSequence.new(Color3.fromRGB(0,170,255))
-        sparks.Color = ColorSequence.new(Color3.fromRGB(100,220,255))
-        glow.Color = ColorSequence.new(Color3.fromRGB(50,180,255))
-        baseFire.Size = NumberSequence.new(3)
-    else
-        baseFire.Color = ColorSequence.new(Color3.fromRGB(255,140,0))
-        sparks.Color = ColorSequence.new(Color3.fromRGB(255,220,100))
-        glow.Color = ColorSequence.new(Color3.fromRGB(255,180,50))
-        baseFire.Size = NumberSequence.new(2)
-    end
-end
-
--- test (si no tenés sistema de ataque)
-RunService.Heartbeat:Connect(function()
-    if LocalPlayer:GetAttribute("Attacking") then
-        setOverheat(true)
-    else
-        setOverheat(false)
-    end
-end)
+-- capas de fuego fijas
+local baseFire = createFireParticle(Torso, Color3.fromRGB(255,140,0), 2, 20, 1.5, 2)  -- naranja
+local sparks = createFireParticle(Torso, Color3.fromRGB(255,180,50), 1, 10, 1, 3)     -- naranja claro
+local glow = createFireParticle(Torso, Color3.fromRGB(255,80,0), 3, 5, 2, 1)          -- rojo fuego
