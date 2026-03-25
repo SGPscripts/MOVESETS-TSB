@@ -80,7 +80,7 @@ if not HasTool(TOOL_NAME) then
     return
 end
 
---// ===== AURA DE FUEGO REAL (R6) =====
+--// ===== AURA DE FUEGO IMPONENTE (R6) =====
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Torso = Character:FindFirstChild("Torso") or Character:FindFirstChild("HumanoidRootPart")
 
@@ -89,10 +89,25 @@ if not Torso then
     return
 end
 
--- crear la llama real
-local fire = Instance.new("Fire")
-fire.Heat = 20                  -- intensidad de la llama
-fire.Size = 7                    -- tamaño de la llama
-fire.Color = Color3.fromRGB(255,140,0)        -- naranja
-fire.SecondaryColor = Color3.fromRGB(255,50,0) -- rojo
-fire.Parent = Torso
+-- función para crear fuego gigante
+local function createBigFire(parent, heat, size, color, secondaryColor)
+    local fire = Instance.new("Fire")
+    fire.Heat = heat
+    fire.Size = size
+    fire.Color = color
+    fire.SecondaryColor = secondaryColor
+    fire.Parent = parent
+    return fire
+end
+
+-- stacking de Fire para más épico
+createBigFire(Torso, 20, 7, Color3.fromRGB(255,140,0), Color3.fromRGB(255,50,0))
+createBigFire(Torso, 25, 9, Color3.fromRGB(255,160,0), Color3.fromRGB(255,60,0))
+createBigFire(Torso, 30, 11, Color3.fromRGB(255,180,50), Color3.fromRGB(255,80,0))
+
+-- agregar luz para que la llama resalte
+local light = Instance.new("PointLight")
+light.Color = Color3.fromRGB(255,140,0)
+light.Range = 15
+light.Brightness = 3
+light.Parent = Torso
